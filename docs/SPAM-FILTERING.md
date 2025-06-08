@@ -9,47 +9,59 @@ ActionSMTP includes built-in spam filtering that's enabled by default:
 
 ## Configuration
 
-All spam settings are configured via environment variables in your `.env` file:
+All spam settings are configured in your `config.yml` file:
 
-```bash
-# Enable/disable spam filtering
-SPAM_CHECK=true
-
-# Spam score thresholds
-SPAM_THRESHOLD=5.0    # Score to flag as spam (adds headers)
-SPAM_REJECT=10.0      # Score to reject email (returns SMTP error)
-
-# SpamAssassin connection
-SPAM_HOST=spamassassin
-SPAM_PORT=783
+```yaml
+# Spam filtering configuration
+spam:
+  enabled: true
+  
+  # SpamAssassin connection settings
+  spamassassin:
+    host: "spamassassin"
+    port: 783
+    
+  # Spam score thresholds
+  thresholds:
+    flag: 5.0      # Score to flag as spam (adds headers)
+    reject: 10.0   # Score to reject email (returns SMTP error)
 ```
 
 ## Threshold Examples
 
 ### Default (Balanced)
-```bash
-SPAM_THRESHOLD=5.0
-SPAM_REJECT=10.0
+```yaml
+spam:
+  thresholds:
+    flag: 5.0
+    reject: 10.0
 ```
 - Good balance between catching spam and avoiding false positives
 
 ### Aggressive
-```bash
-SPAM_THRESHOLD=3.0
-SPAM_REJECT=7.0
+```yaml
+spam:
+  thresholds:
+    flag: 3.0
+    reject: 7.0
 ```
 - Catches more spam but may have more false positives
 
 ### Permissive
-```bash
-SPAM_THRESHOLD=7.0
-SPAM_REJECT=15.0
+```yaml
+spam:
+  thresholds:
+    flag: 7.0
+    reject: 15.0
 ```
 - Fewer false positives but more spam gets through
 
 ### Flag Only (Never Reject)
-```bash
-SPAM_REJECT=999
+```yaml
+spam:
+  thresholds:
+    flag: 5.0
+    reject: 999
 ```
 - All emails delivered with spam headers for Rails to handle
 
@@ -157,11 +169,11 @@ docker-compose exec spamassassin spamc -R < test-email.txt
 ```
 
 ### Too many false positives
-- Increase `SPAM_THRESHOLD` to 6.0 or 7.0
+- Increase spam flag threshold to 6.0 or 7.0 in `config.yml`
 - Add legitimate senders to whitelist
 - Review spam tests in headers to identify problematic rules
 
 ### Too much spam getting through
-- Decrease `SPAM_THRESHOLD` to 4.0 or 3.0
+- Decrease spam flag threshold to 4.0 or 3.0 in `config.yml`
 - Enable additional SpamAssassin plugins
 - Consider adding more DNSBL services (requires code modification)

@@ -63,18 +63,19 @@ cd actionsmtp
 
 2. Copy the example files:
 ```bash
-cp .env.example .env
+cp config.example.yml config.yml
 cp docker-compose.yml.example docker-compose.yml
 ```
 
 3. Edit `config.yml` with your webhook URL and authentication:
 ```yaml
 # Edit config.yml with your settings
-webhook:
-  url: "http://host.docker.internal:3000/rails/action_mailbox/relay/inbound_emails"
-  auth:
-    user: "actionmailbox"
-    pass: "your-secret-password"
+webhooks:
+  yourdomain.com:
+    url: "http://host.docker.internal:3000/rails/action_mailbox/relay/inbound_emails"
+    auth:
+      user: "actionmailbox"
+      pass: "your-secret-password"
 ```
 
 4. Start with Docker Compose:
@@ -254,7 +255,7 @@ action_mailbox:
   ingress_password: your-generated-password
 ```
 
-3. Use this password as your AUTH_PASS in ActionSMTP configuration.
+3. Use this password in your ActionSMTP `config.yml` file under the webhook auth section.
 
 ## Processing Spam in Rails
 
@@ -301,9 +302,9 @@ docker-compose ps
 ```
 
 Common issues:
-- **Port 25 already in use**: Stop other mail servers or change the port in `.env`
+- **Port 25 already in use**: Stop other mail servers or change the port in `config.yml`
 - **Connection refused**: Ensure Docker is running and ports are properly mapped
-- **401 Unauthorized**: Check AUTH_USER and AUTH_PASS match your Rails credentials
+- **401 Unauthorized**: Check webhook auth credentials in `config.yml` match your Rails credentials
 - **SpamAssassin connection failed**: Check that the spamassassin service is running
 
 ## License

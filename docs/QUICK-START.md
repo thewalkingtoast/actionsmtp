@@ -5,17 +5,20 @@
 1. Copy the example files:
 
 ```bash
-cp .env.example .env
+cp config.example.yml config.yml
 cp docker-compose.yml.example docker-compose.yml
 ```
 
-2. Edit `.env` with your settings:
+2. Edit `config.yml` with your settings:
 
-```bash
-# Edit these values
-WEBHOOK_URL=http://host.docker.internal:3000/rails/action_mailbox/relay/inbound_emails
-AUTH_USER=actionmailbox
-AUTH_PASS=your-secret-password-here  # Get from: bin/rails action_mailbox:ingress:details
+```yaml
+# Edit these values in config.yml
+webhooks:
+  yourdomain.com:
+    url: "http://host.docker.internal:3000/rails/action_mailbox/relay/inbound_emails"
+    auth:
+      user: "actionmailbox"
+      pass: "your-secret-password-here"  # Get from: bin/rails action_mailbox:ingress:details
 ```
 
 3. (Optional) Edit `docker-compose.yml` if you need to change ports or add custom SpamAssassin rules.
@@ -43,7 +46,7 @@ echo "Buy Viagra now! Click here!" | mail -s "URGENT!!!" test@yourdomain.com
 
 ## Production Checklist
 
-- [ ] Update `.env` with production webhook URL and credentials
+- [ ] Update `config.yml` with production webhook URL and credentials
 - [ ] DNS MX record points to your server
 - [ ] Firewall allows port 25
 - [ ] SPF record includes your server IP

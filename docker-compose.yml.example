@@ -1,6 +1,7 @@
 services:
   actionsmtp:
-    build: .
+    # build: .
+    image: ghcr.io/cmer/actionsmtp:latest
     ports:
       - "25:25"
     depends_on:

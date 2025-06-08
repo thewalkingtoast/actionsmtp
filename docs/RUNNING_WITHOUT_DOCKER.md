@@ -60,86 +60,58 @@ npm install
 
 ### Basic Usage
 
-Run with default settings:
-
+Create a configuration file:
 ```bash
-sudo node src/index.js http://localhost:3000/rails/action_mailbox/relay/inbound_emails
+cp config.example.yml config.yml
+```
+
+Edit `config.yml` with your settings:
+```yaml
+webhooks:
+  yourdomain.com:
+    url: "http://localhost:3000/rails/action_mailbox/relay/inbound_emails"
+    auth:
+      user: "actionmailbox"
+      pass: "your-secret-password"
+```
+
+Run with default settings:
+```bash
+sudo node src/index.js
 ```
 
 **Note:** `sudo` is required to bind to port 25. To avoid using sudo, you can run on a higher port (see below).
 
 ### Running on a Higher Port (No sudo required)
 
-```bash
-node src/index.js http://localhost:3000/rails/action_mailbox/relay/inbound_emails --port 2525
+Update your `config.yml`:
+```yaml
+server:
+  port: 2525
 ```
 
-### With Authentication
-
+Then run without sudo:
 ```bash
-sudo node src/index.js http://localhost:3000/rails/action_mailbox/relay/inbound_emails \
-  --auth-pass your-secret-password
+node src/index.js
 ```
 
-Or with custom username:
-```bash
-sudo node src/index.js http://localhost:3000/rails/action_mailbox/relay/inbound_emails \
-  --auth-user myuser \
-  --auth-pass your-secret-password
-```
-
-### Disable Spam Filtering
-
-If you don't have SpamAssassin installed or want to disable spam filtering:
+### Available Command Line Options
 
 ```bash
-sudo node src/index.js http://localhost:3000/rails/action_mailbox/relay/inbound_emails \
-  --no-spam-check
-```
-
-### Custom SpamAssassin Host
-
-If SpamAssassin is running on a different host or port:
-
-```bash
-sudo node src/index.js http://localhost:3000/rails/action_mailbox/relay/inbound_emails \
-  --spam-host 192.168.1.100 \
-  --spam-port 783
-```
-
-### All Available Options
-
-```bash
-node src/index.js <webhook_url> [options]
+node src/index.js [options]
 
 Options:
-  --port         SMTP port to listen on (default: 25)
-  --host         Host to bind to (default: 0.0.0.0)
-  --auth-user    Basic auth username for webhook (default: actionmailbox)
-  --auth-pass    Basic auth password for webhook
-  --max-size     Maximum message size in bytes (default: 25MB)
-  --timeout      SMTP timeout in milliseconds (default: 30000)
+  --config       Path to configuration file (default: config.yml)
   --verbose      Enable verbose debug logging
-  --no-spam-check  Disable spam filtering (enabled by default)
-  --spam-host    SpamAssassin daemon host (default: localhost)
-  --spam-port    SpamAssassin daemon port (default: 783)
-  --spam-threshold  Spam score threshold for flagging (default: 5.0)
-  --spam-reject  Spam score threshold for rejection (default: 10.0)
+  --help         Show help message
 ```
 
-## Using Environment Variables
+## Custom Configuration File
 
-Instead of command-line arguments, you can use environment variables:
+You can specify a custom configuration file path:
 
 ```bash
-export WEBHOOK_URL=http://localhost:3000/rails/action_mailbox/relay/inbound_emails
-export AUTH_USER=actionmailbox
-export AUTH_PASS=your-secret-password
-export PORT=2525
-export SPAM_CHECK=false
-export VERBOSE=true
-
-node src/index.js
+node src/index.js --config /path/to/my-config.yml
 ```
 
 ## Running as a Service
@@ -153,7 +125,7 @@ npm install -g pm2
 
 Start ActionSMTP:
 ```bash
-pm2 start src/index.js --name actionsmtp -- http://localhost:3000/rails/action_mailbox/relay/inbound_emails
+pm2 start src/index.js --name actionsmtp
 ```
 
 Save PM2 configuration:
@@ -175,14 +147,12 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/path/to/actionsmtp
-ExecStart=/usr/bin/node /path/to/actionsmtp/src/index.js http://localhost:3000/rails/action_mailbox/relay/inbound_emails
+ExecStart=/usr/bin/node /path/to/actionsmtp/src/index.js
 Restart=on-failure
 RestartSec=10
 
 # Environment variables
 Environment="NODE_ENV=production"
-Environment="AUTH_USER=actionmailbox"
-Environment="AUTH_PASS=your-secret-password"
 
 [Install]
 WantedBy=multi-user.target
@@ -209,9 +179,9 @@ sudo iptables -t nat -A PREROUTING -p tcp --dport 25 -j REDIRECT --to-port 2525
 echo "rdr pass inet proto tcp from any to any port 25 -> 127.0.0.1 port 2525" | sudo pfctl -ef -
 ```
 
-Then run ActionSMTP on port 2525 without sudo:
+Then run ActionSMTP on port 2525 without sudo (configure port 2525 in your config.yml):
 ```bash
-node src/index.js http://localhost:3000/rails/action_mailbox/relay/inbound_emails --port 2525
+node src/index.js
 ```
 
 ## Testing Your Setup
@@ -261,7 +231,7 @@ sudo lsof -i :25
 
 Enable verbose logging to see detailed debug information:
 ```bash
-node src/index.js http://localhost:3000/webhook --verbose
+node src/index.js --verbose
 ```
 
 
@@ -279,11 +249,13 @@ node src/index.js http://localhost:3000/webhook --verbose
    sudo firewall-cmd --reload
    ```
 
-3. **Authentication**: Always use authentication when forwarding to production webhooks:
-   ```bash
-   --auth-pass your-password
-   # Username defaults to 'actionmailbox', or specify custom:
-   --auth-user myuser --auth-pass your-password
+3. **Authentication**: Always use authentication when forwarding to production webhooks. Configure this in your `config.yml`:
+   ```yaml
+   webhooks:
+     yourdomain.com:
+       auth:
+         user: "actionmailbox"
+         pass: "your-password"
    ```
 
 4. **SSL/TLS**: For production use, consider placing ActionSMTP behind a reverse proxy with SSL termination.
@@ -297,10 +269,15 @@ For development, it's recommended to:
 3. Disable spam checking if not needed
 
 ```bash
-node src/index.js http://localhost:3000/rails/action_mailbox/relay/inbound_emails \
-  --port 2525 \
-  --verbose \
-  --no-spam-check
+# Configure in config.yml:
+# server:
+#   port: 2525
+# spam:
+#   enabled: false
+# logging:
+#   verbose: true
+
+node src/index.js --verbose
 ```
 
 This will show detailed logs including:

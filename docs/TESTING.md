@@ -173,10 +173,16 @@ If the test script hangs or times out:
 If you get permission errors on port 25:
 
 1. **Run ActionSMTP with sudo** (if running directly)
-2. **Use a different port** (e.g., 2525):
+2. **Use a different port** (e.g., 2525). Configure port 2525 in your `config.yml`:
+   ```yaml
+   server:
+     port: 2525
+   ```
+   
+   Then start and test:
    ```bash
-   # Start ActionSMTP on port 2525
-   node src/index.js http://localhost:3000/webhook --port 2525
+   # Start ActionSMTP
+   node src/index.js
    
    # Test with the script
    node send_test_email.js localhost:2525
@@ -187,8 +193,8 @@ If you get permission errors on port 25:
 If the SMTP accepts the message but you don't see it in your Rails app:
 
 1. **Check ActionSMTP logs** for webhook errors
-2. **Verify your webhook URL** is correct
-3. **Check authentication** (AUTH_USER/AUTH_PASS)
+2. **Verify your webhook URL** is correct in `config.yml`
+3. **Check authentication** credentials in your webhook configuration
 4. **Test the webhook directly:**
    ```bash
    curl -X POST \
@@ -211,7 +217,7 @@ You can also enable verbose logging on the ActionSMTP server itself to see detai
 
 ```bash
 # Enable verbose logging on the server
-node src/index.js http://localhost:3000/webhook --port 2525 --verbose
+node src/index.js --verbose
 
 # Then run the test in another terminal
 node send_test_email.js localhost:2525
