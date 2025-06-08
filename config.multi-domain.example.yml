@@ -1,0 +1,65 @@
+# ActionSMTP Multi-Domain Configuration Example
+# This example shows how to route emails to different webhooks based on domains
+
+# SMTP Server Settings
+server:
+  port: 25
+  host: "0.0.0.0"
+  maxSize: 26214400  # 25MB in bytes
+  timeout: 30000     # milliseconds
+  
+# Webhook Configuration - Multiple Domain Routing
+webhooks:
+  # Route emails for main company domains to production Rails app
+  example.com, example.org:
+    url: "https://app.example.com/rails/action_mailbox/relay/inbound_emails"
+    auth:
+      user: "actionmailbox"
+      pass: "production-secret-key"
+
+  # Route all subdomains of staging.example.com to staging environment
+  "*.staging.example.com":
+    url: "https://staging.example.com/rails/action_mailbox/relay/inbound_emails"
+    auth:
+      user: "actionmailbox"
+      pass: "staging-secret-key"
+
+  # Route support emails to dedicated support system
+  support.example.com, help.example.com:
+    url: "https://support-system.example.com/email/webhook"
+    auth:
+      user: "support"
+      pass: "support-webhook-key"
+
+  # Route emails for client domains to multi-tenant app
+  client1.com, client2.com, client3.com:
+    url: "https://multitenant.example.com/webhooks/email"
+    auth:
+      user: "tenant-system"
+      pass: "tenant-webhook-key"
+
+  # Development/test domains (no auth required)
+  test.local, dev.local:
+    url: "http://localhost:3000/rails/action_mailbox/relay/inbound_emails"
+
+  # IMPORTANT: Catch-all wildcard should be last if used at all
+  # This will accept ALL other domains - use with caution!
+  # "*":
+  #   url: "https://catch-all.example.com/webhook"
+  #   auth:
+  #     user: "catchall"
+  #     pass: "catchall-key"
+
+# Spam Filtering Configuration
+spam:
+  enabled: true
+  spamassassin:
+    host: "localhost"
+    port: 783
+  thresholds:
+    flag: 5.0      # Score at which to flag as spam
+    reject: 10.0   # Score at which to reject email
+    
+# Logging
+logging:
+  verbose: false

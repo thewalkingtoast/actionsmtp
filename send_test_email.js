@@ -1,10 +1,45 @@
 #!/usr/bin/env node
 
+// This script is used to test the SMTP server connection and send a test email.
+// It can be used to verify that the SMTP server is working correctly and that the email is being sent.
+// It can also be used to test the spam filtering and the webhook forwarding.
+//
+// run `node send_test_email.js --help` to see the usage.
+
 const net = require('net');
 const crypto = require('crypto');
 
 // Parse command line arguments
 const args = process.argv.slice(2);
+
+// Show usage if --help is provided
+if (args.includes('--help') || args.includes('-h')) {
+  console.log(`=== ActionSMTP Test Message Sender ===
+
+Usage: node send_test_email.js [host:port] [options]
+
+Examples:
+  node send_test_email.js                    # Connect to localhost:25
+  node send_test_email.js localhost:2525     # Connect to localhost:2525
+  node send_test_email.js 192.168.1.10       # Connect to 192.168.1.10:25
+  node send_test_email.js mail.example.com:587  # Connect to mail.example.com:587
+
+Environment Variables:
+  FROM=email@domain.com    Set sender email address (default: test@example.com)
+  TO=email@domain.com      Set recipient email address (default: recipient@example.com)
+
+Examples with environment variables:
+  FROM=sender@myorg.com TO=me@myorg.com node send_test_email.js
+  FROM=test@company.org node send_test_email.js localhost:2525
+  TO=admin@example.com node send_test_email.js --verbose
+
+Options:
+  --verbose, -v    Show full SMTP conversation
+  --help, -h       Show this help message
+`);
+  process.exit(0);
+}
+
 let host = 'localhost';
 let port = 25;
 
@@ -13,8 +48,8 @@ if (args.length > 0 && args[0].includes(':')) {
   const [parsedHost, parsedPort] = args[0].split(':');
   host = parsedHost || host;
   port = parseInt(parsedPort) || port;
-} else if (args.length > 0) {
-  // Just host provided
+} else if (args.length > 0 && !args[0].startsWith('--')) {
+  // Just host provided (ignore flags)
   host = args[0];
 }
 
@@ -217,32 +252,6 @@ client.on('close', () => {
   }
 });
 
-// Show usage if --help is provided
-if (args.includes('--help') || args.includes('-h')) {
-  console.log(`
-Usage: node send_test_email.js [host:port] [options]
-
-Examples:
-  node send_test_email.js                    # Connect to localhost:25
-  node send_test_email.js localhost:2525     # Connect to localhost:2525
-  node send_test_email.js 192.168.1.10       # Connect to 192.168.1.10:25
-  node send_test_email.js mail.example.com:587  # Connect to mail.example.com:587
-
-Environment Variables:
-  FROM=email@domain.com    Set sender email address (default: test@example.com)
-  TO=email@domain.com      Set recipient email address (default: recipient@example.com)
-
-Examples with environment variables:
-  FROM=sender@myorg.com TO=me@myorg.com node send_test_email.js
-  FROM=test@company.org node send_test_email.js localhost:2525
-  TO=admin@example.com node send_test_email.js --verbose
-
-Options:
-  --verbose, -v    Show full SMTP conversation
-  --help, -h       Show this help message
-`);
-  process.exit(0);
-}
 
 // Display what we're about to send
 console.log('Email details:');

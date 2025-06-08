@@ -9,14 +9,28 @@ server:
   timeout: 30000     # milliseconds
   
 # Webhook Configuration
-webhook:
-  url: "http://localhost:3000/rails/action_mailbox/relay/inbound_emails"
-  
-  # Basic Authentication (optional)
-  auth:
-    user: "actionmailbox"
-    pass: null  # Set your password here
+#
+# You can define multiple webhooks for different domains/subdomains.
+# The first webhook that matches the domain will be used.
+webhooks:
+  example.org, example.com:
+    url: "http://localhost:3000/rails/action_mailbox/relay/inbound_emails"
     
+    # Basic Authentication (optional)
+    auth:
+      user: "actionmailbox"
+      pass: "set your password here"
+
+  # Wildcard (*) route for every subdomain of mydomain.org
+  # "*.mydomain.org":
+  #   url: "http://localhost:3000/rails/action_mailbox/relay/inbound_emails"
+
+  # Wildcard (*) route for every domain fallback domains. 
+  # This is NOT RECOMMENDED as it'll route every email received to your Rails application and 
+  # will likely lead to a lot of spam and abuse.
+  # "*":
+  #  url: "http://localhost:3000/rails/action_mailbox/relay/inbound_emails"
+
 # Spam Filtering Configuration
 spam:
   enabled: true

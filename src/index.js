@@ -68,13 +68,33 @@ try {
   const configFile = fs.readFileSync(configPath, 'utf8');
   const yamlConfig = yaml.load(configFile);
   
+  // Parse webhooks configuration
+  const webhooks = [];
+  if (yamlConfig.webhooks) {
+    for (const [domains, webhookConfig] of Object.entries(yamlConfig.webhooks)) {
+      if (!webhookConfig.url) {
+        console.error(`Error: URL is required for webhook domains: ${domains}`);
+        process.exit(1);
+      }
+      
+      // Split comma-separated domains and trim whitespace
+      const domainList = domains.split(',').map(d => d.trim()).filter(d => d);
+      
+      webhooks.push({
+        domains: domainList,
+        url: webhookConfig.url,
+        authUser: webhookConfig.auth?.user || 'actionmailbox',
+        authPass: webhookConfig.auth?.pass || null
+      });
+    }
+  }
+  
+  
   // Transform YAML structure to internal config format
   config = {
-    webhookUrl: yamlConfig.webhook?.url,
+    webhooks: webhooks,
     port: yamlConfig.server?.port || 25,
     host: yamlConfig.server?.host || '0.0.0.0',
-    authUser: yamlConfig.webhook?.auth?.user || 'actionmailbox',
-    authPass: yamlConfig.webhook?.auth?.pass || null,
     maxSize: yamlConfig.server?.maxSize || 25 * 1024 * 1024,
     timeout: yamlConfig.server?.timeout || 30000,
     verbose: verboseOverride !== null ? verboseOverride : (yamlConfig.logging?.verbose || false),
@@ -87,8 +107,12 @@ try {
   };
   
   // Validate required fields
-  if (!config.webhookUrl) {
-    console.error('Error: webhook.url is required in configuration file');
+  if (!config.webhooks.length) {
+    console.error('Error: At least one webhook must be configured in the webhooks section');
+    console.error('Example:');
+    console.error('  webhooks:');
+    console.error('    example.com:');
+    console.error('      url: "http://localhost:3000/webhook"');
     process.exit(1);
   }
 } catch (err) {
@@ -102,6 +126,40 @@ try {
     console.error(`Error loading configuration: ${err.message}`);
   }
   process.exit(1);
+}
+
+// Domain matching helper function
+function matchesDomain(emailDomain, pattern) {
+  // Exact match
+  if (pattern === emailDomain) {
+    return true;
+  }
+  
+  // Wildcard match for all domains
+  if (pattern === '*') {
+    return true;
+  }
+  
+  // Subdomain wildcard match (*.example.com)
+  if (pattern.startsWith('*.')) {
+    const baseDomain = pattern.substring(2);
+    return emailDomain === baseDomain || emailDomain.endsWith('.' + baseDomain);
+  }
+  
+  return false;
+}
+
+// Find webhook configuration for a given email domain
+function findWebhookForDomain(domain) {
+  for (const webhook of config.webhooks) {
+    for (const pattern of webhook.domains) {
+      if (matchesDomain(domain, pattern)) {
+        debug(`Domain ${domain} matched pattern ${pattern}`);
+        return webhook;
+      }
+    }
+  }
+  return null;
 }
 
 // Logging functions
@@ -318,18 +376,10 @@ function addSpamHeaders(rawEmail, dnsblResult, spamResult) {
   return Buffer.from(newEmail);
 }
 
-// Forward email to Action Mailbox
-async function forwardEmail(rawEmail, envelope, session) {
+// Forward email to a specific webhook
+async function forwardToWebhook(rawEmail, webhookConfig, session, recipientInfo) {
   try {
-    // Validate envelope
-    if (!envelope.mailFrom || !envelope.mailFrom.address) {
-      throw new Error('Invalid sender address');
-    }
-    if (!envelope.rcptTo || envelope.rcptTo.length === 0) {
-      throw new Error('No recipients');
-    }
-    
-    debug(`Starting webhook forward to ${config.webhookUrl}`);
+    debug(`Starting webhook forward to ${webhookConfig.url}`);
     debug(`Email size: ${rawEmail.length} bytes`);
     
     const headers = {
@@ -339,14 +389,14 @@ async function forwardEmail(rawEmail, envelope, session) {
     };
     
     // Add basic auth if configured
-    if (config.authPass) {
-      debug(`Using basic authentication for webhook (user: ${config.authUser})`);
-      const auth = Buffer.from(`${config.authUser}:${config.authPass}`).toString('base64');
+    if (webhookConfig.authPass) {
+      debug(`Using basic authentication for webhook (user: ${webhookConfig.authUser})`);
+      const auth = Buffer.from(`${webhookConfig.authUser}:${webhookConfig.authPass}`).toString('base64');
       headers['Authorization'] = `Basic ${auth}`;
     }
     
     const startTime = Date.now();
-    const response = await fetch(config.webhookUrl, {
+    const response = await fetch(webhookConfig.url, {
       method: 'POST',
       headers: headers,
       body: rawEmail,
@@ -371,6 +421,63 @@ async function forwardEmail(rawEmail, envelope, session) {
     } else {
       logWebhookResult(session, false, null, err.message);
     }
+    throw err;
+  }
+}
+
+// Forward email to Action Mailbox webhooks based on recipient domains
+async function forwardEmail(rawEmail, envelope, session) {
+  try {
+    // Validate envelope
+    if (!envelope.mailFrom || !envelope.mailFrom.address) {
+      throw new Error('Invalid sender address');
+    }
+    if (!envelope.rcptTo || envelope.rcptTo.length === 0) {
+      throw new Error('No recipients');
+    }
+    
+    // Group recipients by webhook
+    const recipientsByWebhook = new Map();
+    
+    for (const recipient of envelope.rcptTo) {
+      const webhook = session.webhooksByRecipient[recipient.address];
+      if (!webhook) {
+        warn(`No webhook found for recipient ${recipient.address}, skipping`);
+        continue;
+      }
+      
+      const webhookKey = JSON.stringify({
+        url: webhook.url,
+        authUser: webhook.authUser,
+        authPass: webhook.authPass
+      });
+      
+      if (!recipientsByWebhook.has(webhookKey)) {
+        recipientsByWebhook.set(webhookKey, {
+          webhook: webhook,
+          recipients: []
+        });
+      }
+      
+      recipientsByWebhook.get(webhookKey).recipients.push(recipient.address);
+    }
+    
+    // Forward to each unique webhook
+    const forwardPromises = [];
+    for (const [webhookKey, info] of recipientsByWebhook) {
+      debug(`Forwarding to ${info.webhook.url} for recipients: ${info.recipients.join(', ')}`);
+      forwardPromises.push(
+        forwardToWebhook(rawEmail, info.webhook, session, {
+          recipients: info.recipients
+        })
+      );
+    }
+    
+    // Wait for all forwards to complete
+    await Promise.all(forwardPromises);
+    
+    return true;
+  } catch (err) {
     throw err;
   }
 }
@@ -437,6 +544,32 @@ const server = new SMTPServer({
   
   onRcptTo(address, session, callback) {
     debug(`RCPT TO: ${address.address} (IP: ${session.remoteAddress})`);
+    
+    // Extract domain from email address
+    const emailParts = address.address.split('@');
+    if (emailParts.length !== 2) {
+      logEmailInfo(session, 'RCPT_REJECTED', `Invalid email format: ${address.address}`);
+      callback(new Error('550 Invalid recipient address'));
+      return;
+    }
+    
+    const domain = emailParts[1].toLowerCase();
+    
+    // Check if domain is allowed (has a matching webhook)
+    const webhook = findWebhookForDomain(domain);
+    if (!webhook) {
+      logEmailInfo(session, 'RCPT_REJECTED', `Domain not allowed: ${domain}`);
+      callback(new Error(`550 Domain ${domain} not accepted here`));
+      return;
+    }
+    
+    // Store the webhook info for later use
+    if (!session.webhooksByRecipient) {
+      session.webhooksByRecipient = {};
+    }
+    session.webhooksByRecipient[address.address] = webhook;
+    
+    debug(`Domain ${domain} accepted, will route to: ${webhook.url}`);
     callback();
   },
   
@@ -544,15 +677,16 @@ server.on('error', (err) => {
 server.listen(config.port, config.host, () => {
   log('=== ActionSMTP Server Starting ===');
   log(`Listening on: ${config.host}:${config.port}`);
-  log(`Webhook URL: ${config.webhookUrl}`);
   log(`Max message size: ${Math.round(config.maxSize / 1024 / 1024)}MB`);
   log(`Timeout: ${config.timeout}ms`);
   log(`Verbose logging: ${config.verbose ? 'enabled' : 'disabled'}`);
   
-  if (config.authPass) {
-    log(`Authentication: enabled (user: ${config.authUser})`);
-  } else {
-    log('Authentication: disabled');
+  // Log webhook configurations
+  log(`Configured webhooks:`);
+  for (const webhook of config.webhooks) {
+    const domains = webhook.domains.join(', ');
+    const auth = webhook.authPass ? ` (auth: ${webhook.authUser})` : ' (no auth)';
+    log(`  ${domains} -> ${webhook.url}${auth}`);
   }
   
   if (config.spamCheck) {

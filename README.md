@@ -86,6 +86,51 @@ docker-compose up -d
 
 ActionSMTP uses a YAML configuration file (`config.yml`). See `config.example.yml` for all available options.
 
+### Multi-Domain Routing
+
+ActionSMTP supports routing emails to different webhooks based on the recipient domain. This allows you to:
+- Run a single SMTP server for multiple applications
+- Route different domains to different Rails apps or webhook endpoints
+- Use different authentication credentials per domain
+- Implement domain whitelisting (only configured domains are accepted)
+
+#### Example Multi-Domain Configuration
+
+```yaml
+webhooks:
+  # Route main domains to production
+  example.com, example.org:
+    url: "https://app.example.com/rails/action_mailbox/relay/inbound_emails"
+    auth:
+      user: "actionmailbox"
+      pass: "production-secret"
+
+  # Route all subdomains to staging
+  "*.staging.example.com":
+    url: "https://staging.example.com/rails/action_mailbox/relay/inbound_emails"
+    auth:
+      user: "actionmailbox"
+      pass: "staging-secret"
+
+  # Different app for support emails
+  support.example.com:
+    url: "https://support.example.com/webhook"
+
+  # Catch-all (not recommended - accepts any domain)
+  # "*":
+  #   url: "https://default.example.com/webhook"
+```
+
+#### Domain Matching Rules
+
+1. **Exact match**: `example.com` matches only `example.com`
+2. **Multiple domains**: `example.com, example.org` matches either domain
+3. **Subdomain wildcard**: `*.example.com` matches `example.com`, `sub.example.com`, `deep.sub.example.com`
+4. **Catch-all**: `*` matches any domain (use with extreme caution)
+
+Domains are matched in the order they appear in the configuration. The first match wins.
+
+See `config.multi-domain.example.yml` for a comprehensive example.
 
 ### Command Line Options
 
