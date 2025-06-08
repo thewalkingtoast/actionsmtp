@@ -15,6 +15,51 @@ A lightweight SMTP server that forwards incoming emails to Rails Action Mailbox 
 
 ## Installation
 
+### Option 1: Using Docker Image from GitHub Container Registry
+
+1. Pull the latest image:
+```bash
+docker pull ghcr.io/cmer/actionsmtp:latest
+```
+
+2. Run with environment variables:
+```bash
+docker run -d \
+  --name actionsmtp \
+  -p 25:25 \
+  -e WEBHOOK_URL=http://host.docker.internal:3000/rails/action_mailbox/relay/inbound_emails \
+  -e AUTH_PASS=your-secret-password \
+  ghcr.io/cmer/actionsmtp:latest
+```
+
+### Option 2: Using Docker Compose
+
+1. Create a `docker-compose.yml` file:
+```yaml
+version: '3.8'
+services:
+  actionsmtp:
+    image: ghcr.io/cmer/actionsmtp:latest
+    ports:
+      - "25:25"
+    environment:
+      - WEBHOOK_URL=http://host.docker.internal:3000/rails/action_mailbox/relay/inbound_emails
+      - AUTH_PASS=your-secret-password
+    depends_on:
+      - spamassassin
+
+  spamassassin:
+    image: instantlinux/spamassassin:latest
+    hostname: spamassassin
+```
+
+2. Start the services:
+```bash
+docker-compose up -d
+```
+
+### Option 3: Build from Source
+
 1. Clone the repository:
 ```bash
 git clone https://github.com/cmer/actionsmtp.git
