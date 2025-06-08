@@ -1,0 +1,36 @@
+{
+  "name": "actionsmtp",
+  "version": "1.0.0",
+  "description": "SMTP server that forwards emails to Action Mailbox webhooks",
+  "main": "src/index.js",
+  "bin": {
+    "actionsmtp": "./src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "keywords": [
+    "smtp",
+    "email",
+    "rails",
+    "action-mailbox",
+    "webhook"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "smtp-server": "^3.13.0",
+    "node-fetch": "^2.7.0",
+    "mailparser": "^3.6.5"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "@jest/globals": "^29.7.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

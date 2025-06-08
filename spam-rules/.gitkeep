@@ -1,0 +1,2 @@
+# This directory is for custom SpamAssassin rules
+# Place your .cf files here and mount this directory in docker-compose.yml

@@ -1,0 +1,30 @@
+services:
+  actionsmtp:
+    build: .
+    ports:
+      - "25:25"
+    depends_on:
+      - spamassassin
+    env_file: .env
+    restart: unless-stopped
+    networks:
+      - smtp-network
+    extra_hosts:
+      # This allows the container to connect to localhost services on the host
+      - "host.docker.internal:host-gateway"
+
+  spamassassin:
+    image: instantlinux/spamassassin:latest
+    env_file: .env
+    volumes:
+      - spam-config:/var/lib/spamassassin
+    restart: unless-stopped
+    networks:
+      - smtp-network
+
+networks:
+  smtp-network:
+    driver: bridge
+
+volumes:
+  spam-config:
