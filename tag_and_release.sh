@@ -50,9 +50,14 @@ echo "$VERSION" > VERSION
 # Update package.json version
 npm version "$VERSION" --no-git-tag-version --allow-same-version
 
-# Commit the VERSION file and package files
+# Commit the VERSION file and package files (if there are changes)
 git add VERSION package.json package-lock.json
-git commit -m "Release v$VERSION"
+if ! git diff --cached --quiet; then
+    git commit -m "Release v$VERSION"
+    echo "Committed version updates"
+else
+    echo "No changes to commit (version files already up to date)"
+fi
 
 # Create and push tag
 git tag "v$VERSION"
