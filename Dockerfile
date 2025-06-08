@@ -14,28 +14,19 @@ RUN npm ci --only=production
 
 # Copy application code
 COPY src ./src
+COPY config.example.yml ./
 
 # Make scripts executable
-RUN chmod +x src/index.js src/run.sh
+RUN chmod +x src/index.js
 
 # Expose SMTP port
 EXPOSE 25
 
-# Environment variables with defaults
-ENV WEBHOOK_URL="http://host.docker.internal:3000/rails/action_mailbox/relay/inbound_emails" \
-    PORT=25 \
-    HOST=0.0.0.0 \
-    MAX_SIZE=26214400 \
-    TIMEOUT=30000 \
-    SPAM_CHECK=true \
-    SPAM_HOST=spamassassin \
-    SPAM_PORT=783 \
-    SPAM_THRESHOLD=5.0 \
-    SPAM_REJECT=10.0 \
-    VERBOSE=false
+# Default config path
+ENV ACTIONSMTP_CONFIG_PATH=/app/config.yml
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
 
-# Run the script
-CMD ["./src/run.sh"]
+# Run the application
+CMD ["node", "src/index.js"]

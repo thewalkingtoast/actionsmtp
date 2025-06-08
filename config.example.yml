@@ -1,0 +1,36 @@
+# ActionSMTP Configuration File
+# Copy this file to config.yml and customize for your setup
+
+# SMTP Server Settings
+server:
+  port: 25
+  host: "0.0.0.0"
+  maxSize: 26214400  # 25MB in bytes
+  timeout: 30000     # milliseconds
+  
+# Webhook Configuration
+webhook:
+  url: "http://localhost:3000/rails/action_mailbox/relay/inbound_emails"
+  
+  # Basic Authentication (optional)
+  auth:
+    user: "actionmailbox"
+    pass: null  # Set your password here
+    
+# Spam Filtering Configuration
+spam:
+  enabled: true
+  
+  # SpamAssassin Settings
+  spamassassin:
+    host: "localhost"
+    port: 783
+    
+  # Spam Thresholds
+  thresholds:
+    flag: 5.0      # Score at which to flag as spam
+    reject: 10.0   # Score at which to reject email
+    
+# Logging
+logging:
+  verbose: false

@@ -1,91 +1,89 @@
 const { describe, test, expect } = require('@jest/globals');
+const yaml = require('js-yaml');
 
 describe('Configuration Tests', () => {
-  test('should parse command line arguments correctly', () => {
-    // Test argument parsing logic
-    const parseArgs = (args) => {
-      const config = {
-        webhookUrl: args[0],
-        port: 25,
-        host: '0.0.0.0',
-        authUser: null,
-        authPass: null,
-        maxSize: 25 * 1024 * 1024,
-        timeout: 30000,
-        verbose: false,
-        spamCheck: true,
-        spamHost: 'localhost',
-        spamPort: 783,
-        spamThreshold: 5.0,
-        spamReject: 10.0
+  test('should parse YAML configuration correctly', () => {
+    // Test YAML parsing logic
+    const parseYamlConfig = (yamlConfig) => {
+      return {
+        webhookUrl: yamlConfig.webhook?.url,
+        port: yamlConfig.server?.port || 25,
+        host: yamlConfig.server?.host || '0.0.0.0',
+        authUser: yamlConfig.webhook?.auth?.user || 'actionmailbox',
+        authPass: yamlConfig.webhook?.auth?.pass || null,
+        maxSize: yamlConfig.server?.maxSize || 25 * 1024 * 1024,
+        timeout: yamlConfig.server?.timeout || 30000,
+        verbose: yamlConfig.logging?.verbose || false,
+        spamCheck: yamlConfig.spam?.enabled !== false,
+        spamHost: yamlConfig.spam?.spamassassin?.host || 'localhost',
+        spamPort: yamlConfig.spam?.spamassassin?.port || 783,
+        spamThreshold: yamlConfig.spam?.thresholds?.flag || 5.0,
+        spamReject: yamlConfig.spam?.thresholds?.reject || 10.0
       };
-
-      for (let i = 1; i < args.length; i++) {
-        const arg = args[i];
-        const next = args[i + 1];
-        
-        switch (arg) {
-          case '--port':
-            config.port = parseInt(next) || 25;
-            i++;
-            break;
-          case '--host':
-            config.host = next || '0.0.0.0';
-            i++;
-            break;
-          case '--auth-user':
-            config.authUser = next;
-            i++;
-            break;
-          case '--auth-pass':
-            config.authPass = next;
-            i++;
-            break;
-          case '--verbose':
-            config.verbose = true;
-            break;
-          case '--no-spam-check':
-            config.spamCheck = false;
-            break;
-          case '--spam-threshold':
-            config.spamThreshold = parseFloat(next) || 5.0;
-            i++;
-            break;
-          case '--spam-reject':
-            config.spamReject = parseFloat(next) || 10.0;
-            i++;
-            break;
-        }
-      }
-
-      return config;
     };
 
     // Test basic configuration
-    const config1 = parseArgs(['http://localhost/webhook']);
+    const yamlStr1 = `
+webhook:
+  url: http://localhost/webhook
+`;
+    const config1 = parseYamlConfig(yaml.load(yamlStr1));
     expect(config1.webhookUrl).toBe('http://localhost/webhook');
     expect(config1.port).toBe(25);
     expect(config1.spamCheck).toBe(true);
 
     // Test with custom port
-    const config2 = parseArgs(['http://localhost/webhook', '--port', '2525']);
+    const yamlStr2 = `
+webhook:
+  url: http://localhost/webhook
+server:
+  port: 2525
+`;
+    const config2 = parseYamlConfig(yaml.load(yamlStr2));
     expect(config2.port).toBe(2525);
 
     // Test with authentication
-    const config3 = parseArgs(['http://localhost/webhook', '--auth-user', 'user', '--auth-pass', 'pass']);
+    const yamlStr3 = `
+webhook:
+  url: http://localhost/webhook
+  auth:
+    user: user
+    pass: pass
+`;
+    const config3 = parseYamlConfig(yaml.load(yamlStr3));
     expect(config3.authUser).toBe('user');
     expect(config3.authPass).toBe('pass');
 
     // Test spam settings
-    const config4 = parseArgs(['http://localhost/webhook', '--no-spam-check']);
+    const yamlStr4 = `
+webhook:
+  url: http://localhost/webhook
+spam:
+  enabled: false
+`;
+    const config4 = parseYamlConfig(yaml.load(yamlStr4));
     expect(config4.spamCheck).toBe(false);
 
-    const config5 = parseArgs(['http://localhost/webhook', '--spam-threshold', '3.0', '--spam-reject', '7.0']);
+    const yamlStr5 = `
+webhook:
+  url: http://localhost/webhook
+spam:
+  thresholds:
+    flag: 3.0
+    reject: 7.0
+`;
+    const config5 = parseYamlConfig(yaml.load(yamlStr5));
     expect(config5.spamThreshold).toBe(3.0);
     expect(config5.spamReject).toBe(7.0);
 
     // Test verbose mode
-    const config6 = parseArgs(['http://localhost/webhook', '--verbose']);
+    const yamlStr6 = `
+webhook:
+  url: http://localhost/webhook
+logging:
+  verbose: true
+`;
+    const config6 = parseYamlConfig(yaml.load(yamlStr6));
     expect(config6.verbose).toBe(true);
   });
 

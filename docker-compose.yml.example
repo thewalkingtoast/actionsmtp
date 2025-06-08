@@ -5,7 +5,8 @@ services:
       - "25:25"
     depends_on:
       - spamassassin
-    env_file: .env
+    volumes:
+      - ./config.yml:/app/config.yml:ro
     restart: unless-stopped
     networks:
       - smtp-network
@@ -15,7 +16,6 @@ services:
 
   spamassassin:
     image: instantlinux/spamassassin:latest
-    env_file: .env
     volumes:
       - spam-config:/var/lib/spamassassin
     restart: unless-stopped

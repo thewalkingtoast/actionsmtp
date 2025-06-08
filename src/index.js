@@ -6,110 +6,102 @@ const fetch = require('node-fetch');
 const { Writable } = require('stream');
 const dns = require('dns').promises;
 const net = require('net');
+const fs = require('fs');
+const path = require('path');
+const yaml = require('js-yaml');
 
 // Parse command line arguments
 const args = process.argv.slice(2);
-if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
-  console.log(`
-Usage: actionsmtp <webhook_url> [options]
+let configPath = process.env.ACTIONSMTP_CONFIG_PATH || 'config.yml';
+let verboseOverride = null;
 
-Arguments:
-  webhook_url    The Action Mailbox webhook URL (e.g., http://localhost/rails/action_mailbox/relay/inbound_emails)
+// Parse minimal CLI args
+for (let i = 0; i < args.length; i++) {
+  const arg = args[i];
+  
+  if (arg === '--help' || arg === '-h') {
+    console.log(`
+Usage: actionsmtp [options]
 
 Options:
-  --port         SMTP port to listen on (default: 25)
-  --host         Host to bind to (default: 0.0.0.0)
-  --auth-user    Basic auth username for webhook (default: actionmailbox)
-  --auth-pass    Basic auth password for webhook
-  --max-size     Maximum message size in bytes (default: 25MB)
-  --timeout      SMTP timeout in milliseconds (default: 30000)
-  --verbose      Enable verbose logging
-  --no-spam-check  Disable spam filtering (enabled by default)
-  --spam-host    SpamAssassin daemon host (default: localhost)
-  --spam-port    SpamAssassin daemon port (default: 783)
-  --spam-threshold  Spam score threshold for flagging (default: 5.0)
-  --spam-reject  Spam score threshold for rejection (default: 10.0)
+  --config       Path to YAML configuration file (default: config.yml or $ACTIONSMTP_CONFIG_PATH)
+  --verbose      Enable verbose logging (overrides config file)
+  --help, -h     Show this help message
+
+Environment:
+  ACTIONSMTP_CONFIG_PATH    Default path to configuration file (overridden by --config)
 
 Example:
-  actionsmtp http://localhost:3000/rails/action_mailbox/relay/inbound_emails
-  actionsmtp https://myapp.com/rails/action_mailbox/relay/inbound_emails --auth-pass=secret
-  actionsmtp https://myapp.com/rails/action_mailbox/relay/inbound_emails --auth-user=customuser --auth-pass=secret
-  actionsmtp <webhook_url> --spam-threshold 3.0 --spam-reject 7.0  # More aggressive spam filtering
+  actionsmtp
+  actionsmtp --config /etc/actionsmtp/config.yml
+  actionsmtp --verbose
+  ACTIONSMTP_CONFIG_PATH=/etc/actionsmtp.yml actionsmtp
 `);
-  process.exit(0);
+    process.exit(0);
+  } else if (arg === '--config' && i + 1 < args.length) {
+    configPath = args[++i];
+  } else if (arg === '--verbose') {
+    verboseOverride = true;
+  } else if (!arg.startsWith('--')) {
+    // Backward compatibility: treat first non-flag argument as config path
+    configPath = arg;
+  }
 }
 
-// Configuration with sensible defaults
-const config = {
-  webhookUrl: args[0],
-  port: 25,
-  host: '0.0.0.0',
-  authUser: 'actionmailbox',
-  authPass: null,
-  maxSize: 25 * 1024 * 1024, // 25MB
-  timeout: 30000,
-  verbose: false,
-  spamCheck: true, // ON by default
-  spamHost: 'localhost',
-  spamPort: 783,
-  spamThreshold: 5.0,
-  spamReject: 10.0,
-  spamAction: 'flag'
-};
-
-// Parse options
-for (let i = 1; i < args.length; i++) {
-  const arg = args[i];
-  const next = args[i + 1];
-  
-  switch (arg) {
-    case '--port':
-      config.port = parseInt(next) || 25;
-      i++;
-      break;
-    case '--host':
-      config.host = next || '0.0.0.0';
-      i++;
-      break;
-    case '--auth-user':
-      config.authUser = next || 'actionmailbox';
-      i++;
-      break;
-    case '--auth-pass':
-      config.authPass = next;
-      i++;
-      break;
-    case '--max-size':
-      config.maxSize = parseInt(next) || config.maxSize;
-      i++;
-      break;
-    case '--timeout':
-      config.timeout = parseInt(next) || config.timeout;
-      i++;
-      break;
-    case '--verbose':
-      config.verbose = true;
-      break;
-    case '--no-spam-check':
-      config.spamCheck = false;
-      break;
-    case '--spam-host':
-      config.spamHost = next || 'localhost';
-      i++;
-      break;
-    case '--spam-port':
-      config.spamPort = parseInt(next) || 783;
-      i++;
-      break;
-    case '--spam-threshold':
-      config.spamThreshold = parseFloat(next) || 5.0;
-      i++;
-      break;
-    case '--spam-reject':
-      config.spamReject = parseFloat(next) || 10.0;
-      i++;
-      break;
+// Load configuration from YAML file
+let config;
+try {
+  // Check if config file exists, if not copy from example
+  if (!fs.existsSync(configPath)) {
+    const examplePath = path.join(path.dirname(configPath), 'config.example.yml');
+    
+    if (fs.existsSync(examplePath)) {
+      console.log(`No config file found at ${configPath}, creating from example...`);
+      fs.copyFileSync(examplePath, configPath);
+      console.log(`Created ${configPath} from example. Please edit it with your settings.`);
+      console.log('Starting with default configuration...\n');
+    } else {
+      throw new Error(`Configuration file not found: ${configPath} (and no example file found)`);
+    }
   }
+  
+  const configFile = fs.readFileSync(configPath, 'utf8');
+  const yamlConfig = yaml.load(configFile);
+  
+  // Transform YAML structure to internal config format
+  config = {
+    webhookUrl: yamlConfig.webhook?.url,
+    port: yamlConfig.server?.port || 25,
+    host: yamlConfig.server?.host || '0.0.0.0',
+    authUser: yamlConfig.webhook?.auth?.user || 'actionmailbox',
+    authPass: yamlConfig.webhook?.auth?.pass || null,
+    maxSize: yamlConfig.server?.maxSize || 25 * 1024 * 1024,
+    timeout: yamlConfig.server?.timeout || 30000,
+    verbose: verboseOverride !== null ? verboseOverride : (yamlConfig.logging?.verbose || false),
+    spamCheck: yamlConfig.spam?.enabled !== false,
+    spamHost: yamlConfig.spam?.spamassassin?.host || 'localhost',
+    spamPort: yamlConfig.spam?.spamassassin?.port || 783,
+    spamThreshold: yamlConfig.spam?.thresholds?.flag || 5.0,
+    spamReject: yamlConfig.spam?.thresholds?.reject || 10.0,
+    spamAction: 'flag'
+  };
+  
+  // Validate required fields
+  if (!config.webhookUrl) {
+    console.error('Error: webhook.url is required in configuration file');
+    process.exit(1);
+  }
+} catch (err) {
+  if (err.code === 'ENOENT') {
+    console.error(`Error: Configuration file not found: ${configPath}`);
+    console.error('Create a config.yml file or specify a different path with --config');
+    console.error('\nExample configuration file available at: config.example.yml');
+  } else if (err.name === 'YAMLException') {
+    console.error(`Error: Invalid YAML in configuration file: ${err.message}`);
+  } else {
+    console.error(`Error loading configuration: ${err.message}`);
+  }
+  process.exit(1);
 }
 
 // Logging functions

@@ -4,7 +4,7 @@ const { describe, test, expect, beforeAll, afterAll } = require('@jest/globals')
 
 describe('SMTP Server Tests', () => {
   let server;
-  let serverPort = 2525;
+  let serverPort = 0; // Let the system assign a free port
 
   beforeAll((done) => {
     // Create a test SMTP server
@@ -15,7 +15,10 @@ describe('SMTP Server Tests', () => {
       }
     });
 
-    server.listen(serverPort, done);
+    server.listen(serverPort, () => {
+      serverPort = server.server.address().port;
+      done();
+    });
   });
 
   afterAll((done) => {

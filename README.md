@@ -22,38 +22,33 @@ A lightweight SMTP server that forwards incoming emails to Rails Action Mailbox 
 docker pull ghcr.io/cmer/actionsmtp:latest
 ```
 
-2. Run with environment variables:
+2. Create a configuration file:
+```bash
+# Copy the example configuration
+cp config.example.yml config.yml
+# Edit config.yml with your webhook settings
+```
+
+3. Run with Docker:
 ```bash
 docker run -d \
   --name actionsmtp \
   -p 25:25 \
-  -e WEBHOOK_URL=http://host.docker.internal:3000/rails/action_mailbox/relay/inbound_emails \
-  -e AUTH_PASS=your-secret-password \
+  -v $(pwd)/config.yml:/app/config.yml:ro \
   ghcr.io/cmer/actionsmtp:latest
 ```
 
 ### Option 2: Using Docker Compose
 
-1. Create a `docker-compose.yml` file:
-```yaml
-version: '3.8'
-services:
-  actionsmtp:
-    image: ghcr.io/cmer/actionsmtp:latest
-    ports:
-      - "25:25"
-    environment:
-      - WEBHOOK_URL=http://host.docker.internal:3000/rails/action_mailbox/relay/inbound_emails
-      - AUTH_PASS=your-secret-password
-    depends_on:
-      - spamassassin
-
-  spamassassin:
-    image: instantlinux/spamassassin:latest
-    hostname: spamassassin
+1. Copy the example files:
+```bash
+cp config.example.yml config.yml
+cp docker-compose.yml.example docker-compose.yml
 ```
 
-2. Start the services:
+2. Edit `config.yml` with your webhook URL and authentication settings
+
+3. Start the services:
 ```bash
 docker-compose up -d
 ```
@@ -72,12 +67,14 @@ cp .env.example .env
 cp docker-compose.yml.example docker-compose.yml
 ```
 
-3. Edit `.env` with your webhook URL and authentication:
-```bash
-# Edit .env with your settings
-WEBHOOK_URL=http://host.docker.internal:3000/rails/action_mailbox/relay/inbound_emails
-AUTH_USER=actionmailbox
-AUTH_PASS=your-secret-password
+3. Edit `config.yml` with your webhook URL and authentication:
+```yaml
+# Edit config.yml with your settings
+webhook:
+  url: "http://host.docker.internal:3000/rails/action_mailbox/relay/inbound_emails"
+  auth:
+    user: "actionmailbox"
+    pass: "your-secret-password"
 ```
 
 4. Start with Docker Compose:
@@ -87,25 +84,16 @@ docker-compose up -d
 
 ## Configuration
 
-All configuration is done via environment variables. See `.env.example` for all available options.
+ActionSMTP uses a YAML configuration file (`config.yml`). See `config.example.yml` for all available options.
 
-## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `WEBHOOK_URL` | http://host.docker.internal:3000/... | Action Mailbox webhook URL |
-| `AUTH_USER` | actionmailbox | Basic auth username |
-| `AUTH_PASS` | - | Basic auth password |
-| `SPAM_CHECK` | true | Enable spam filtering |
-| `SPAM_THRESHOLD` | 5.0 | Score to flag as spam |
-| `SPAM_REJECT` | 10.0 | Score to reject email |
-| `SPAM_HOST` | spamassassin | SpamAssassin host |
-| `SPAM_PORT` | 783 | SpamAssassin port |
-| `PORT` | 25 | SMTP listen port |
-| `HOST` | 0.0.0.0 | Bind address |
-| `MAX_SIZE` | 26214400 | Max email size (bytes) |
-| `TIMEOUT` | 30000 | Timeout (ms) |
-| `VERBOSE` | false | Enable verbose logging |
+### Command Line Options
+
+| Option | Description |
+|--------|-------------|
+| `--config` | Path to configuration file (default: config.yml) |
+| `--verbose` | Enable verbose logging (overrides config file) |
+| `--help` | Show help message |
 
 ## Spam Filtering
 
@@ -124,20 +112,26 @@ Spam filtering is **enabled by default** with a balanced approach:
 
 ### Customizing Spam Thresholds
 
+Edit your `config.yml` file:
+
 ```yaml
 # More aggressive: flag at 3.0, reject at 7.0
-environment:
-  - SPAM_THRESHOLD=3.0
-  - SPAM_REJECT=7.0
+spam:
+  thresholds:
+    flag: 3.0
+    reject: 7.0
 
 # More permissive: flag at 7.0, reject at 15.0
-environment:
-  - SPAM_THRESHOLD=7.0
-  - SPAM_REJECT=15.0
+spam:
+  thresholds:
+    flag: 7.0
+    reject: 15.0
 
 # Flag only, never reject
-environment:
-  - SPAM_REJECT=999
+spam:
+  thresholds:
+    flag: 5.0
+    reject: 999
 ```
 
 ### Spam Headers Added
@@ -170,7 +164,7 @@ Shows key events with timestamps:
 ```
 
 ### Verbose Logging
-Enable with `VERBOSE=true` to see detailed debugging information:
+Enable verbose logging to see detailed debugging information:
 - SMTP command details
 - SpamAssassin connection status
 - DNSBL check results
@@ -178,30 +172,16 @@ Enable with `VERBOSE=true` to see detailed debugging information:
 - Processing timings
 
 ```yaml
-# Enable verbose logging
-environment:
-  - VERBOSE=true
+# In config.yml
+logging:
+  verbose: true
 ```
 
-Or when running directly:
+Or override via command line:
 ```bash
-node src/index.js http://localhost:3000/webhook --verbose
-```
-
-## Docker Compose Configuration
-
-The `docker-compose.yml.example` file includes:
-- ActionSMTP service configured to use environment variables
-- SpamAssassin service for spam filtering
-- Proper networking to connect to Rails on your host machine
-
-You can customize the Docker Compose configuration by editing your local `docker-compose.yml` file. For example, to mount custom SpamAssassin rules:
-
-```yaml
-services:
-  spamassassin:
-    volumes:
-      - ./spam-rules:/etc/spamassassin/local.d:ro
+actionsmtp --verbose
+# or
+node src/index.js --verbose
 ```
 
 ## Setting up Action Mailbox

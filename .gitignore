@@ -9,6 +9,9 @@ yarn-error.log*
 .env.local
 .env.*.local
 
+# Config files
+config.yml
+
 # Docker files
 docker-compose.yml
 docker-compose.override.yml
