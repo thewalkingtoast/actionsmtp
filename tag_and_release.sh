@@ -48,7 +48,7 @@ echo "Creating release v$VERSION..."
 echo "$VERSION" > VERSION
 
 # Update package.json version
-npm version "$VERSION" --no-git-tag-version
+npm version "$VERSION" --no-git-tag-version --allow-same-version
 
 # Commit the VERSION file and package files
 git add VERSION package.json package-lock.json
