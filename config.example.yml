@@ -8,6 +8,12 @@ server:
   maxSize: 26214400  # 25MB in bytes
   timeout: 30000     # milliseconds
   
+  # Server hostname for HELO/EHLO responses (optional)
+  # This should match the PTR (reverse DNS) record for your server's IP address
+  # If not specified, defaults to the system's hostname
+  # Example: mail.example.com
+  # hostname: "mail.example.com"
+  
 # Webhook Configuration
 #
 # You can define multiple webhooks for different domains/subdomains.

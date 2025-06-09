@@ -9,6 +9,7 @@ const net = require('net');
 const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
+const os = require('os');
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -95,6 +96,7 @@ try {
     webhooks: webhooks,
     port: yamlConfig.server?.port || 25,
     host: yamlConfig.server?.host || '0.0.0.0',
+    hostname: yamlConfig.server?.hostname || os.hostname(),
     maxSize: yamlConfig.server?.maxSize || 25 * 1024 * 1024,
     timeout: yamlConfig.server?.timeout || 30000,
     verbose: verboseOverride !== null ? verboseOverride : (yamlConfig.logging?.verbose || false),
@@ -501,8 +503,8 @@ class EmailCollector extends Writable {
 
 // Create SMTP server
 const server = new SMTPServer({
-  name: 'actionsmtp',
-  banner: 'ActionSMTP - SMTP to Action Mailbox Forwarder',
+  name: config.hostname,
+  banner: 'ActionSMTP',
   size: config.maxSize,
   hideSize: false,
   useXForward: true,
@@ -677,6 +679,7 @@ server.on('error', (err) => {
 server.listen(config.port, config.host, () => {
   log('=== ActionSMTP Server Starting ===');
   log(`Listening on: ${config.host}:${config.port}`);
+  log(`Server hostname: ${config.hostname}`);
   log(`Max message size: ${Math.round(config.maxSize / 1024 / 1024)}MB`);
   log(`Timeout: ${config.timeout}ms`);
   log(`Verbose logging: ${config.verbose ? 'enabled' : 'disabled'}`);
