@@ -29,4 +29,4 @@ ENV ACTIONSMTP_CONFIG_PATH=/app/config.yml
 ENTRYPOINT ["dumb-init", "--"]
 
 # Run the application
-CMD ["node", "src/index.js"]
+CMD ["node", "src/index.js", "--config", "./data/config.yml"]
